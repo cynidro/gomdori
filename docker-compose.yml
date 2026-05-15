@@ -1,0 +1,7 @@
+services:
+  gomdori:
+    build: .
+    container_name: gomdori
+    restart: unless-stopped
+    ports:
+      - "8005:8005"
