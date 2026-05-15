@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>곰돌이 진료 일정</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+  :root {
+    --bg: #000;
+    --bg2: #1c1c1e;
+    --bg3: #2c2c2e;
+    --border: #38383a;
+    --text: #fff;
+    --text-sub: #8e8e93;
+    --text-faint: #48484a;
+
+    --kim-bg: rgba(10,132,255,0.20);
+    --kim-dot: #0a84ff;
+    --kim-text: #409cff;
+    --kim-past-bg: rgba(10,132,255,0.06);
+    --kim-past-text: rgba(64,156,255,0.35);
+
+    --yang-bg: rgba(255,159,10,0.20);
+    --yang-dot: #ff9f0a;
+    --yang-text: #ffb340;
+    --yang-past-bg: rgba(255,159,10,0.06);
+    --yang-past-text: rgba(255,179,64,0.35);
+
+    --radius: 13px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; overflow-x: hidden; }
+
+  body {
+    font-family: -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 48px;
+  }
+
+  /* ── 헤더 ─────────────────────────── */
+  header { padding: 56px 20px 0; }
+  .header-month { font-size: 34px; font-weight: 700; letter-spacing: -0.5px; }
+  .header-year  { font-size: 34px; font-weight: 300; color: var(--text-sub); letter-spacing: -0.5px; }
+
+  /* ── 월 탐색 ─────────────────────── */
+  .month-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 20px 0;
+  }
+  .nav-arrows { display: flex; gap: 8px; }
+  .nav-btn {
+    background: var(--bg3); border: none; border-radius: 50%;
+    width: 32px; height: 32px; font-size: 16px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: var(--kim-dot);
+  }
+  .nav-btn:active { opacity: 0.6; }
+  .today-btn {
+    background: none; border: none; color: var(--kim-dot);
+    font-size: 15px; font-family: inherit; cursor: pointer; padding: 4px 0;
+  }
+
+  /* ── 범례 ─────────────────────────── */
+  .legend { display: flex; gap: 14px; padding: 12px 20px 10px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-sub); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-kim  { background: var(--kim-dot); }
+  .dot-yang { background: var(--yang-dot); }
+
+  /* ── 캘린더 ──────────────────────── */
+  .calendar-wrap { width: 100%; padding: 0 10px; }
+
+  .day-headers { display: grid; grid-template-columns: repeat(7,1fr); margin-bottom: 4px; }
+  .day-header {
+    text-align: center; padding: 4px 0;
+    font-size: 11px; font-weight: 600; color: var(--text-sub); letter-spacing: 0.2px;
+  }
+  .day-header.sun { color: #ff453a; }
+  .day-header.sat { color: var(--kim-dot); }
+
+  .calendar-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+
+  .cal-cell {
+    min-height: 66px;
+    padding: 3px 2px 3px;
+    border-radius: 9px;
+    background: var(--bg2);
+    overflow: hidden;
+  }
+  .cal-cell.empty { background: transparent; }
+
+  /* 날짜 숫자 — 작게 */
+  .cal-day-num {
+    font-size: 13px; font-weight: 400;
+    color: var(--text); line-height: 1;
+    margin-bottom: 3px;
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+  }
+  .cal-cell.sun .cal-day-num { color: #ff453a; }
+  .cal-cell.sat .cal-day-num { color: var(--kim-dot); }
+  .cal-cell.today .cal-day-num { background: var(--kim-dot); color: #fff; font-weight: 700; }
+
+  /* 뱃지 */
+  .doc-badge {
+    display: block; border-radius: 4px;
+    font-size: 8px; font-weight: 700;
+    padding: 2px 3px; margin-bottom: 2px;
+    line-height: 1.3; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  }
+  .badge-kim       { background: var(--kim-bg);      color: var(--kim-text); }
+  .badge-kim.past  { background: var(--kim-past-bg);  color: var(--kim-past-text); }
+  .badge-yang      { background: var(--yang-bg);      color: var(--yang-text); }
+  .badge-yang.past { background: var(--yang-past-bg); color: var(--yang-past-text); }
+
+  /* ── 구분선 ──────────────────────── */
+  .divider { height: 1px; background: var(--border); margin: 20px 10px 0; }
+
+  /* ── 하단 리스트 ───────────────────── */
+  .list-section { padding: 0 10px; margin-top: 20px; }
+  .list-section-title {
+    font-size: 13px; font-weight: 600; color: var(--text-sub);
+    letter-spacing: 0.3px; margin-bottom: 10px; padding: 0 2px; text-transform: uppercase;
+  }
+
+  .list-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .list-col { background: var(--bg2); border-radius: var(--radius); overflow: hidden; }
+  .list-col-header {
+    padding: 10px 12px; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--border);
+  }
+  .list-col-header.kim  { color: var(--kim-text); }
+  .list-col-header.yang { color: var(--yang-text); }
+
+  .col-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .col-dot.kim  { background: var(--kim-dot); }
+  .col-dot.yang { background: var(--yang-dot); }
+
+  /* 하단 리스트 행 — 날짜 싱크를 위해 고정 높이 */
+  .list-row {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    min-height: 52px; /* 양쪽 높이 통일 */
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .list-row:last-child { border-bottom: none; }
+  /* 빈 행 (날짜 맞추기용) */
+  .list-row.placeholder {
+    background: transparent;
+    min-height: 52px;
+  }
+
+  .list-date { font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .list-time  { color: var(--text-sub); font-size: 11px; }
+
+  .list-empty { padding: 16px 12px; font-size: 12px; color: var(--text-faint); text-align: center; }
+
+  /* ── 로딩/에러 ────────────────────── */
+  .status-wrap { text-align: center; padding: 60px 20px; color: var(--text-sub); font-size: 14px; }
+  .spinner {
+    width: 24px; height: 24px;
+    border: 2px solid var(--border); border-top-color: var(--kim-dot);
+    border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .refresh-btn {
+    display: block; margin: 20px auto 0;
+    background: none; border: none; padding: 8px 16px;
+    font-size: 14px; color: var(--kim-dot); cursor: pointer; font-family: inherit;
+  }
+  .refresh-btn:disabled { opacity: 0.4; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <span class="header-month" id="headerMonth">5월</span><span class="header-year" id="headerYear"> 2026</span>
+  </div>
+</header>
+
+<div class="month-nav">
+  <button class="today-btn" id="todayBtn">오늘</button>
+  <div class="nav-arrows">
+    <button class="nav-btn" id="prevBtn">‹</button>
+    <button class="nav-btn" id="nextBtn">›</button>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot dot-kim"></div>김현 원장</div>
+  <div class="legend-item"><div class="legend-dot dot-yang"></div>양희규 원장 (김현 不在시간)</div>
+</div>
+
+<div class="calendar-wrap">
+  <div class="day-headers">
+    <div class="day-header sun">일</div>
+    <div class="day-header">월</div>
+    <div class="day-header">화</div>
+    <div class="day-header">수</div>
+    <div class="day-header">목</div>
+    <div class="day-header">금</div>
+    <div class="day-header sat">토</div>
+  </div>
+  <div class="calendar-grid" id="calendarGrid">
+    <div class="status-wrap" style="grid-column:1/-1"><div class="spinner"></div>불러오는 중...</div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<div class="list-section" id="listSection" style="display:none;">
+  <div class="list-section-title">근무 일정 목록</div>
+  <div class="list-columns">
+    <div class="list-col">
+      <div class="list-col-header kim"><div class="col-dot kim"></div>김현 원장</div>
+      <div id="kimList"></div>
+    </div>
+    <div class="list-col">
+      <div class="list-col-header yang"><div class="col-dot yang"></div>양희규 원장</div>
+      <div id="yangList"></div>
+    </div>
+  </div>
+</div>
+
+<button class="refresh-btn" id="refreshBtn">↻ 새로 불러오기</button>
+
+<script>
+const KIM = "김현", YANG = "양희규";
+const state = { year: new Date().getFullYear(), month: new Date().getMonth()+1, loading: false, data: null };
+const $ = id => document.getElementById(id);
+
+function toDate(s) { const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
+function isPast(s) { const t=new Date(); t.setHours(0,0,0,0); return toDate(s)<t; }
+function isToday(y,m,d) { const t=new Date(); return t.getFullYear()===y&&t.getMonth()+1===m&&t.getDate()===d; }
+function dow(s) { return ["일","월","화","수","목","금","토"][toDate(s).getDay()]; }
+
+// 시간 겹침 여부: 김현 [ks,ke], 양희규 [ys,ye] 가 완전히 겹치지 않으면 양희규 표시
+// "부재 시간에 양희규가 있으면" → 양희규 구간이 김현 구간에 완전 포함되지 않으면 표시
+function yangVisibleOnDay(kimR, yangR) {
+  if (!kimR) return true; // 김현 없는 날이면 무조건 표시
+  const ks = parseInt(kimR.start), ke = parseInt(kimR.end);
+  const ys = parseInt(yangR.start), ye = parseInt(yangR.end);
+  // 양희규가 김현 구간에 완전히 포함되면 숨김, 아니면 표시
+  return !(ys >= ks && ye <= ke);
+}
+
+// 뱃지용 짧은 텍스트: "김 9~17", "양 14~22"
+function badge(name, r) {
+  const s = parseInt(r.start), e = parseInt(r.end);
+  const prefix = name === KIM ? "김" : "양";
+  return `${prefix} ${s}~${e}`;
+}
+
+function updateHeader() {
+  $("headerMonth").textContent = `${state.month}월`;
+  $("headerYear").textContent  = ` ${state.year}`;
+}
+
+function renderGrid() {
+  const {year, month, data} = state;
+  const grid = $("calendarGrid");
+
+  if (state.loading) {
+    grid.innerHTML = `<div class="status-wrap" style="grid-column:1/-1"><div class="spinner"></div>불러오는 중...</div>`;
+    $("listSection").style.display = "none";
+    return;
+  }
+
+  const kimD = {}, yangD = {};
+  if (data) {
+    (data[KIM]  || []).forEach(r => kimD[r.date]  = r);
+    (data[YANG] || []).forEach(r => yangD[r.date] = r);
+  }
+
+  const firstDow = new Date(year, month-1, 1).getDay();
+  const days = new Date(year, month, 0).getDate();
+  let html = "";
+
+  for (let i=0; i<firstDow; i++) html += `<div class="cal-cell empty"></div>`;
+
+  for (let d=1; d<=days; d++) {
+    const ds  = `${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const dw  = (firstDow + d - 1) % 7;
+    const cls = ["cal-cell", dw===0?"sun":dw===6?"sat":"", isToday(year,month,d)?"today":""].filter(Boolean).join(" ");
+    const past = isPast(ds);
+
+    let badges = "";
+    if (kimD[ds]) {
+      badges += `<span class="doc-badge badge-kim${past?" past":""}">${badge(KIM, kimD[ds])}</span>`;
+    }
+    // 시간 기준: 양희규가 김현 부재 시간에 걸쳐있으면 표시
+    if (yangD[ds] && yangVisibleOnDay(kimD[ds] || null, yangD[ds])) {
+      badges += `<span class="doc-badge badge-yang${past?" past":""}">${badge(YANG, yangD[ds])}</span>`;
+    }
+
+    html += `<div class="${cls}"><div class="cal-day-num">${d}</div>${badges}</div>`;
+  }
+
+  grid.innerHTML = html;
+  renderLists(kimD, yangD);
+}
+
+function renderLists(kimD, yangD) {
+  $("listSection").style.display = "";
+
+  // 오늘 이후(당일 포함)만
+  const todayStr = (() => {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;
+  })();
+
+  // 김현 목록 (오늘 이후)
+  const kimRows = Object.keys(kimD).filter(ds => ds >= todayStr).sort();
+
+  // 양희규: 시간 기준으로 표시할 날만, 오늘 이후
+  const yangRows = Object.keys(yangD)
+    .filter(ds => ds >= todayStr && yangVisibleOnDay(kimD[ds] || null, yangD[ds]))
+    .sort();
+
+  // 좌우 날짜 싱크: 전체 유니온 날짜셋 기준으로 정렬
+  const allDates = [...new Set([...kimRows, ...yangRows])].sort();
+
+  let kimHtml = "", yangHtml = "";
+
+  if (allDates.length === 0) {
+    kimHtml = `<div class="list-empty">일정 없음</div>`;
+    yangHtml = `<div class="list-empty">일정 없음</div>`;
+  } else {
+    allDates.forEach(ds => {
+      const [,mm,dd] = ds.split("-");
+      const label = `${+mm}/${+dd} (${dow(ds)})`;
+
+      // 김현 행
+      if (kimD[ds] && kimRows.includes(ds)) {
+        kimHtml += `<div class="list-row">
+          <div class="list-date">${label}</div>
+          <div class="list-time">${kimD[ds].start}:00 – ${kimD[ds].end}:00</div>
+        </div>`;
+      } else {
+        // 해당 날짜에 김현 일정 없으면 빈 자리 (높이 맞추기)
+        kimHtml += `<div class="list-row placeholder"></div>`;
+      }
+
+      // 양희규 행
+      if (yangD[ds] && yangRows.includes(ds)) {
+        yangHtml += `<div class="list-row">
+          <div class="list-date">${label}</div>
+          <div class="list-time">${yangD[ds].start}:00 – ${yangD[ds].end}:00</div>
+        </div>`;
+      } else {
+        yangHtml += `<div class="list-row placeholder"></div>`;
+      }
+    });
+  }
+
+  $("kimList").innerHTML  = kimHtml;
+  $("yangList").innerHTML = yangHtml;
+}
+
+async function load(force=false) {
+  if (state.loading) return;
+  state.loading = true; state.data = null;
+  updateHeader(); renderGrid();
+  $("refreshBtn").disabled = true;
+
+  try {
+    const res = await fetch(
+      force ? `/api/refresh?year=${state.year}&month=${state.month}`
+            : `/api/schedule?year=${state.year}&month=${state.month}`,
+      { method: force ? "POST" : "GET" }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    state.data = (await res.json()).schedule;
+  } catch(e) {
+    $("calendarGrid").innerHTML = `<div class="status-wrap" style="grid-column:1/-1">⚠️ 불러오기 실패<br><small style="color:#636366">${e.message}</small></div>`;
+    state.loading = false; $("refreshBtn").disabled = false; return;
+  }
+
+  state.loading = false; $("refreshBtn").disabled = false;
+  renderGrid();
+}
+
+$("prevBtn").onclick  = () => { state.month===1?(state.year--,state.month=12):state.month--; load(); };
+$("nextBtn").onclick  = () => { state.month===12?(state.year++,state.month=1):state.month++; load(); };
+$("todayBtn").onclick = () => { const n=new Date(); state.year=n.getFullYear(); state.month=n.getMonth()+1; load(); };
+$("refreshBtn").onclick = () => load(true);
+
+load();
+</script>
+</body>
+</html>
