@@ -5,3 +5,7 @@ services:
     restart: unless-stopped
     ports:
       - "8005:8005"
+    volumes:
+      - /volume1/projects/gomdori/static:/app/static
+      - /volume1/projects/gomdori/scraper.py:/app/scraper.py
+      - /volume1/projects/gomdori/main.py:/app/main.py
