@@ -103,9 +103,12 @@
 </style>
 </head>
 <body>
-<header>
+<header style="display: flex; justify-content: space-between; align-items: flex-end; padding: 56px 20px 0;">
   <div>
     <span class="header-month" id="headerMonth">5월</span><span class="header-year" id="headerYear"> 2026</span>
+  </div>
+  <div id="navDuration" style="font-size: 13px; font-weight: 600; color: var(--yang-text); display: none; align-items: center; gap: 4px; background: rgba(255,159,10,0.15); padding: 6px 12px; border-radius: 20px;">
+    <span>🚗</span> <span id="durationVal">...</span>
   </div>
 </header>
 <div class="month-nav">
@@ -241,8 +244,20 @@ function renderGrid() {
 function renderLists(kimD, yangD) {
   $("listSection").style.display="";
   const t=new Date(), todayStr=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;
-  const kimRows=Object.keys(kimD).filter(ds=>ds>=todayStr).sort();
-  const yangRows=Object.keys(yangD).filter(ds=>ds>=todayStr&&yangVisibleOnDay(kimD[ds]||null,yangD[ds])).sort();
+  
+  const isCurrentMonth = (state.year === t.getFullYear() && state.month === t.getMonth()+1);
+  
+  let kimRows, yangRows;
+  if (isCurrentMonth) {
+    const limit = new Date(t.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const limitStr = `${limit.getFullYear()}-${String(limit.getMonth()+1).padStart(2,"0")}-${String(limit.getDate()).padStart(2,"0")}`;
+    kimRows = Object.keys(kimD).filter(ds=>ds>=todayStr && ds<=limitStr).sort();
+    yangRows = Object.keys(yangD).filter(ds=>ds>=todayStr && ds<=limitStr && yangVisibleOnDay(kimD[ds]||null,yangD[ds])).sort();
+  } else {
+    kimRows = Object.keys(kimD).filter(ds=>ds>=todayStr).sort();
+    yangRows = Object.keys(yangD).filter(ds=>ds>=todayStr && yangVisibleOnDay(kimD[ds]||null,yangD[ds])).sort();
+  }
+  
   const allDates=[...new Set([...kimRows,...yangRows])].sort();
   let kimHtml="", yangHtml="";
   if (allDates.length===0) { kimHtml=`<div class="list-empty">일정 없음</div>`; yangHtml=kimHtml; }
@@ -254,6 +269,23 @@ function renderLists(kimD, yangD) {
     });
   }
   $("kimList").innerHTML=kimHtml; $("yangList").innerHTML=yangHtml;
+}
+async function updateDuration() {
+  const el = $("navDuration");
+  const val = $("durationVal");
+  try {
+    const res = await fetch("/api/duration");
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    if (data.duration_min !== null && data.duration_min !== undefined) {
+      val.textContent = `병원까지 ${data.duration_min}분`;
+      el.style.display = "flex";
+    } else {
+      el.style.display = "none";
+    }
+  } catch(e) {
+    el.style.display = "none";
+  }
 }
 async function load(force=false) {
   if (state.loading) return;
@@ -267,6 +299,7 @@ async function load(force=false) {
     state.loading=false; $("refreshBtn").disabled=false; return;
   }
   state.loading=false; $("refreshBtn").disabled=false; renderGrid();
+  updateDuration();
 }
 $("prevBtn").onclick  = () => { state.month===1?(state.year--,state.month=12):state.month--; load(); };
 $("nextBtn").onclick  = () => { state.month===12?(state.year++,state.month=1):state.month++; load(); };

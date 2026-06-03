@@ -1,4 +1,3 @@
-cat > "/Users/jaewon/Library/CloudStorage/SynologyDrive-projects/gomdori/scraper.py" << 'EOF'
 import re
 import httpx
 from bs4 import BeautifulSoup
@@ -24,7 +23,6 @@ _NAME_PAT = re.compile(
     r"[(\[（【]\s*(\d{1,2})\s*[-~]\s*(\d{1,2})\s*[)\]）】]"
 )
 
-
 def fetch_post_list() -> list[dict]:
     posts = []
     page = 1
@@ -49,7 +47,6 @@ def fetch_post_list() -> list[dict]:
         page += 1
     return posts
 
-
 def infer_year_month_from_title(title: str) -> tuple[int, int] | None:
     m = re.search(r"(\d{4})년\s*(\d{1,2})월", title)
     if m:
@@ -64,7 +61,6 @@ def infer_year_month_from_title(title: str) -> tuple[int, int] | None:
         return year, month
     return None
 
-
 def parse_schedule_from_post(seq: int, year: int, month: int) -> dict:
     url = f"{BASE_URL}?cf=view&seq={seq}&pg=1"
     resp = httpx.get(url, headers=HEADERS, timeout=15, follow_redirects=True)
@@ -72,7 +68,6 @@ def parse_schedule_from_post(seq: int, year: int, month: int) -> dict:
     content_div = _find_content_div(soup)
     text = content_div.get_text() if content_div else soup.get_text()
     return _parse_schedule_text(text, year, month)
-
 
 def _find_content_div(soup: BeautifulSoup):
     for selector in [".view_content", ".board_view", ".content", ".bbs_content", "#content", ".post-content"]:
@@ -84,13 +79,11 @@ def _find_content_div(soup: BeautifulSoup):
         return max(candidates, key=lambda d: len(d.get_text()))
     return None
 
-
 def _parse_schedule_text(text: str, year: int, month: int) -> dict:
     by_doctor = {PRIMARY_DOCTOR: [], BACKUP_DOCTOR: []}
     all_day: dict[str, list[dict]] = {}
     lines = text.split("\n")
     current_day = None
-
     date_patterns = [
         re.compile(r"(\d{1,2})/(\d{1,2})\s*[(\[（【]?[월화수목금토일]"),
         re.compile(r"(\d{1,2})월\s*(\d{1,2})일"),
@@ -101,7 +94,6 @@ def _parse_schedule_text(text: str, year: int, month: int) -> dict:
         )
         for doctor, pattern in DOCTOR_PATTERNS.items()
     }
-
     for line in lines:
         line = line.strip()
         if not line:
@@ -140,9 +132,7 @@ def _parse_schedule_text(text: str, year: int, month: int) -> dict:
                 all_day[date_str].append({
                     "name": full_name, "start": f"{start_h:02d}", "end": f"{end_h:02d}",
                 })
-
     return {PRIMARY_DOCTOR: by_doctor[PRIMARY_DOCTOR], BACKUP_DOCTOR: by_doctor[BACKUP_DOCTOR], "all": all_day}
-
 
 def get_schedule(year: int, month: int) -> dict:
     posts = fetch_post_list()

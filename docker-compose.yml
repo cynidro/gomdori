@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     ports:
       - "8005:8005"
+    environment:
+      - KAKAO_REST_API_KEY=YOUR_KAKAO_REST_API_KEY
     volumes:
       - /volume1/projects/gomdori/static:/app/static
       - /volume1/projects/gomdori/scraper.py:/app/scraper.py

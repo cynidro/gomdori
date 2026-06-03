@@ -9,10 +9,15 @@ from fastapi.responses import FileResponse, JSONResponse
 
 import scraper
 
+import os
+import httpx
+
 app = FastAPI(title="gomdori-schedule")
 
 _cache: dict[str, dict] = {}
 CACHE_TTL = 3600
+
+_duration_cache = {"fetched_at": 0, "duration_min": None}
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -28,6 +33,46 @@ def manifest():
 
 
 # ── API ──────────────────────────────────────────────────────────────────────
+@app.get("/api/duration")
+def get_duration():
+    kakao_key = os.getenv("KAKAO_REST_API_KEY", "")
+    if not kakao_key:
+        return {"duration_min": None, "error": "KAKAO_REST_API_KEY environment variable not set"}
+
+    now = time.time()
+    # Cache for 5 minutes (300 seconds)
+    if _duration_cache["duration_min"] is not None and (now - _duration_cache["fetched_at"]) < 300:
+        return {"duration_min": _duration_cache["duration_min"], "cached": True}
+
+    url = "https://apis-navi.kakaomobility.com/v1/directions"
+    # origin: 동작구 사당로13길 31 (126.9634938,37.4789596)
+    # destination: 서초구 방배로 226 (126.9950796,37.4839884)
+    params = {
+        "origin": "126.9634938,37.4789596",
+        "destination": "126.9950796,37.4839884",
+        "priority": "RECOMMEND"
+    }
+    headers = {
+        "Authorization": f"KakaoAK {kakao_key}"
+    }
+    try:
+        resp = httpx.get(url, params=params, headers=headers, timeout=5)
+        if resp.status_code != 200:
+            return {"duration_min": None, "error": f"Kakao API HTTP {resp.status_code}: {resp.text}"}
+        
+        data = resp.json()
+        if "routes" in data and len(data["routes"]) > 0:
+            duration_sec = data["routes"][0]["summary"]["duration"]
+            duration_min = round(duration_sec / 60)
+            _duration_cache["duration_min"] = duration_min
+            _duration_cache["fetched_at"] = now
+            return {"duration_min": duration_min, "cached": False}
+        else:
+            return {"duration_min": None, "error": "No route found in Kakao API response"}
+    except Exception as e:
+        return {"duration_min": None, "error": str(e)}
+
+
 @app.get("/api/schedule")
 def get_schedule(year: int | None = None, month: int | None = None):
     now = datetime.now()
