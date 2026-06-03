@@ -100,6 +100,35 @@
   .duty-time-pill { font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 20px; flex-shrink: 0; }
   .sheet-empty { text-align: center; padding: 32px 20px; color: var(--text-faint); font-size: 15px; }
   .sheet-empty-icon { font-size: 36px; margin-bottom: 10px; }
+  .nav-map-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: #2c2c2e;
+    border: none;
+    padding: 16px 20px;
+    border-radius: 14px;
+    margin-bottom: 12px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .nav-map-btn:last-child {
+    margin-bottom: 0;
+  }
+  .nav-map-btn:active {
+    background: #3a3a3c !important;
+  }
+  #navDuration {
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  #navDuration:active {
+    opacity: 0.7;
+  }
 </style>
 </head>
 <body>
@@ -107,7 +136,7 @@
   <div>
     <span class="header-month" id="headerMonth">5월</span><span class="header-year" id="headerYear"> 2026</span>
   </div>
-  <div id="navDuration" style="font-size: 13px; font-weight: 600; color: var(--yang-text); display: none; align-items: center; gap: 4px; background: rgba(255,159,10,0.15); padding: 6px 12px; border-radius: 20px;">
+  <div id="navDuration" onclick="openMapSheet()" style="font-size: 13px; font-weight: 600; color: var(--yang-text); display: none; align-items: center; gap: 4px; background: rgba(255,159,10,0.15); padding: 6px 12px; border-radius: 20px;">
     <span>🚗</span> <span id="durationVal">...</span>
   </div>
 </header>
@@ -159,6 +188,38 @@
     <div class="sheet-date-dow" id="sheetDateDow"></div>
   </div>
   <div class="sheet-body" id="sheetBody"></div>
+</div>
+<!-- 길찾기 앱 선택 팝업 시트 -->
+<div class="sheet-backdrop" id="mapSheetBackdrop"></div>
+<div class="sheet" id="mapSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-date-label">길찾기 앱 선택</div>
+    <div class="sheet-date-dow" style="color: var(--text-sub);">연세곰돌이소아청소년과의원으로 안내합니다.</div>
+  </div>
+  <div class="sheet-body" style="padding: 20px 16px 30px;">
+    <button class="nav-map-btn" onclick="openMap('naver')">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 22px;">💚</span>
+        <span>네이버 지도</span>
+      </div>
+      <span style="color: var(--text-sub); font-size: 14px;">앱 실행 ›</span>
+    </button>
+    <button class="nav-map-btn" onclick="openMap('kakao')">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 22px;">💛</span>
+        <span>카카오맵</span>
+      </div>
+      <span style="color: var(--text-sub); font-size: 14px;">앱 실행 ›</span>
+    </button>
+    <button class="nav-map-btn" onclick="openMap('tmap')">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 22px;">💙</span>
+        <span>티맵 (TMAP)</span>
+      </div>
+      <span style="color: var(--text-sub); font-size: 14px;">앱 실행 ›</span>
+    </button>
+  </div>
 </div>
 <script>
 const KIM = "김현", YANG = "양희규";
@@ -218,6 +279,42 @@ $("sheetBackdrop").addEventListener("click", closeSheet);
 let touchStartY = 0;
 $("sheet").addEventListener("touchstart", e => { touchStartY=e.touches[0].clientY; }, {passive:true});
 $("sheet").addEventListener("touchend",   e => { if (e.changedTouches[0].clientY-touchStartY>60) closeSheet(); }, {passive:true});
+
+// 길찾기 팝업 관련 함수 및 이벤트
+function openMapSheet() {
+  $("mapSheetBackdrop").classList.add("visible");
+  $("mapSheet").classList.add("visible");
+  document.body.style.overflow = "hidden";
+}
+function closeMapSheet() {
+  $("mapSheetBackdrop").classList.remove("visible");
+  $("mapSheet").classList.remove("visible");
+  document.body.style.overflow = "";
+}
+$("mapSheetBackdrop").addEventListener("click", closeMapSheet);
+let mapTouchStartY = 0;
+$("mapSheet").addEventListener("touchstart", e => { mapTouchStartY=e.touches[0].clientY; }, {passive:true});
+$("mapSheet").addEventListener("touchend",   e => { if (e.changedTouches[0].clientY-mapTouchStartY>60) closeMapSheet(); }, {passive:true});
+
+function openMap(type) {
+  const dlat = 37.4839884;
+  const dlng = 126.9950796;
+  const dname = encodeURIComponent("연세곰돌이소아청소년과의원");
+  let url = "";
+
+  if (type === "naver") {
+    url = `nmap://route/car?dlat=${dlat}&dlng=${dlng}&dname=${dname}&appname=kr.gomdori`;
+  } else if (type === "kakao") {
+    url = `kakaomap://route?ep=${dlat},${dlng}&by=CAR`;
+  } else if (type === "tmap") {
+    url = `tmap://route?rGoName=${dname}&rGoX=${dlng}&rGoY=${dlat}`;
+  }
+
+  if (url) {
+    location.href = url;
+    closeMapSheet();
+  }
+}
 function renderGrid() {
   const {year,month,data} = state;
   const grid = $("calendarGrid");
