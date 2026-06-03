@@ -297,8 +297,8 @@ $("mapSheet").addEventListener("touchstart", e => { mapTouchStartY=e.touches[0].
 $("mapSheet").addEventListener("touchend",   e => { if (e.changedTouches[0].clientY-mapTouchStartY>60) closeMapSheet(); }, {passive:true});
 
 function openMap(type) {
-  const dlat = 37.4839884;
-  const dlng = 126.9950796;
+  const dlat = 37.4839845;
+  const dlng = 126.9880196;
   const dname = encodeURIComponent("연세곰돌이소아청소년과의원");
   let url = "";
 
