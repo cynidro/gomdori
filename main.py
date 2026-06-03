@@ -46,10 +46,10 @@ def get_duration():
 
     url = "https://apis-navi.kakaomobility.com/v1/directions"
     # origin: 동작구 사당로13길 31 (126.9634938,37.4789596)
-    # destination: 서초구 방배로 226 (126.9880196,37.4839845)
+    # destination: 서초구 방배로 226 (126.990481,37.493288)
     params = {
         "origin": "126.9634938,37.4789596",
-        "destination": "126.9880196,37.4839845",
+        "destination": "126.990481,37.493288",
         "priority": "RECOMMEND"
     }
     headers = {
