@@ -14,12 +14,34 @@ import httpx
 
 app = FastAPI(title="gomdori-schedule")
 
-_cache: dict[str, dict] = {}
-CACHE_TTL = 3600
-
-_duration_cache = {"fetched_at": 0, "duration_min": None}
+import json
 
 STATIC_DIR = Path(__file__).parent / "static"
+CACHE_FILE = STATIC_DIR / "schedule_cache.json"
+
+def load_persistent_cache() -> dict:
+    if CACHE_FILE.exists():
+        try:
+            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[cache] Failed to load cache: {e}", flush=True)
+    return {}
+
+def save_persistent_cache(cache_data: dict):
+    try:
+        CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(cache_data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[cache] Failed to save cache: {e}", flush=True)
+
+_persistent_cache = load_persistent_cache()
+
+def is_schedule_empty(data: dict) -> bool:
+    return all(len(v) == 0 for v in data.values() if isinstance(v, list))
+
+_duration_cache = {"fetched_at": 0, "duration_min": None}
 
 
 # ── 정적 파일 ────────────────────────────────────────────────────────────────
@@ -82,35 +104,42 @@ def get_schedule(year: int | None = None, month: int | None = None):
         raise HTTPException(status_code=400, detail="Invalid year/month")
 
     cache_key = f"{year}-{month:02d}"
-    cached = _cache.get(cache_key)
-    if cached and (time.time() - cached["fetched_at"]) < CACHE_TTL:
-        return JSONResponse({"year": year, "month": month, "schedule": cached["data"], "cached": True})
+    cached_data = _persistent_cache.get(cache_key)
+    
+    if cached_data:
+        return JSONResponse({"year": year, "month": month, "schedule": cached_data, "cached": True})
 
     try:
         data = scraper.get_schedule(year, month)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"스크래핑 실패: {e}")
 
-    _cache[cache_key] = {"data": data, "fetched_at": time.time()}
+    # Only cache permanently if it contains at least one schedule entry
+    if not is_schedule_empty(data):
+        _persistent_cache[cache_key] = data
+        save_persistent_cache(_persistent_cache)
+
     return JSONResponse({"year": year, "month": month, "schedule": data, "cached": False})
 
 
 @app.post("/api/refresh")
 def refresh_schedule(year: int, month: int):
-    """캐시를 무효화하고 강제로 다시 스크래핑한다."""
+    """캐시를 무효화하고 강제로 다시 스크래핑한 뒤 로컬 파일에 업데이트한다."""
     if not (1 <= month <= 12) or not (2020 <= year <= 2099):
         raise HTTPException(status_code=400, detail="Invalid year/month")
 
     cache_key = f"{year}-{month:02d}"
-    _cache.pop(cache_key, None)
 
     try:
         data = scraper.get_schedule(year, month)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"스크래핑 실패: {e}")
 
-    _cache[cache_key] = {"data": data, "fetched_at": time.time()}
-    total_count = sum(len(v) for v in data.values())
+    # For manual refresh, we save it regardless of whether it's empty or not
+    _persistent_cache[cache_key] = data
+    save_persistent_cache(_persistent_cache)
+
+    total_count = sum(len(v) for v in data.values() if isinstance(v, list))
     return JSONResponse({
         "year": year,
         "month": month,
@@ -125,8 +154,13 @@ async def _prefetch(year: int, month: int):
     key = f"{year}-{month:02d}"
     try:
         data = scraper.get_schedule(year, month)
-        _cache[key] = {"data": data, "fetched_at": time.time()}
-        print(f"[prefetch] {year}-{month:02d} → {len(data)}일 캐시 완료", flush=True)
+        if not is_schedule_empty(data):
+            _persistent_cache[key] = data
+            save_persistent_cache(_persistent_cache)
+            total = sum(len(v) for v in data.values() if isinstance(v, list))
+            print(f"[prefetch] {year}-{month:02d} → {total}일 캐시 완료 및 저장", flush=True)
+        else:
+            print(f"[prefetch] {year}-{month:02d} 데이터가 아직 비어있어 저장하지 않음", flush=True)
     except Exception as e:
         print(f"[prefetch] {year}-{month:02d} 실패: {e}", flush=True)
 
@@ -141,8 +175,8 @@ async def _scheduler():
             nm = now.month % 12 + 1
             ny = now.year + (1 if now.month == 12 else 0)
             key = f"{ny}-{nm:02d}"
-            cached = _cache.get(key)
-            if not cached or (time.time() - cached["fetched_at"]) > CACHE_TTL:
+            # 기존 캐시에 데이터가 없거나 비어있는 경우에만 백그라운드로 땡겨옴
+            if key not in _persistent_cache or is_schedule_empty(_persistent_cache[key]):
                 await _prefetch(ny, nm)
 
 
